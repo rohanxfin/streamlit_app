@@ -2,9 +2,8 @@ matplotlib
 category_encoders
 xgboost
 streamlit
-numpy
+numpy<3
 streamlit
-numpy
 pandas
 joblib
 catboost
