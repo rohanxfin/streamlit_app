@@ -1,10 +1,12 @@
-pandas
 matplotlib
-scikit-learn==1.5.2
 category_encoders
 xgboost
 streamlit==1.41.1
-joblib==1.4.2
 numpy>=1.24.3
-catboost>=1.2.1  
+streamlit==1.41.1
+numpy>=1.24.3
+pandas==1.5.3
+joblib==1.2.0
+catboost==1.2
+scikit-learn==1.2.2
 setuptools>=65.5.0
