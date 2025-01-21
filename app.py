@@ -12,7 +12,7 @@ def log1p_transform(x):
 
 
 # Load the model
-model = joblib.load('catboost_best_model.joblib')
+model = joblib.load('best_model.joblib')
 
 # Load the dataset (ensure you replace 'your_dataset.csv' with the actual path to your dataset)
 df = pd.read_csv('final_data_suzuki.csv')
