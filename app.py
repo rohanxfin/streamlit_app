@@ -158,7 +158,7 @@ def clamp_price(predicted_price, make, model, variant, age):
             base_avg = (p5 + p95) / 2
 
             years_beyond = age - last_boundary
-            discount_factor = max(1 - 0.10 * years_beyond, 0.50)
+            discount_factor = max(1 - 0.10 * years_beyond, 0.60)
             discounted = base_avg * discount_factor
             return discounted
         else:
@@ -203,7 +203,7 @@ def clamp_price(predicted_price, make, model, variant, age):
                 years_beyond = age - last_boundary
             else:
                 years_beyond = 0  # e.g. if last boundary is 8 but age is 7
-            discount_factor = max(1 - 0.10 * years_beyond, 0.50)
+            discount_factor = max(1 - 0.10 * years_beyond, 0.60)
             return base_avg * discount_factor
         else:
             return predicted_price
