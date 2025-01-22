@@ -67,6 +67,35 @@ for segment, group in grouped:
         segment_bounds[segment] = (p5, p95)
 
 
+all_labels = ['0-2', '2-5', '5-6', '6-8', '8-10', '10+']
+all_bins =    [  0,    2,    5,    6,    8,   10,    float('inf') ]
+
+def get_last_available_bucket(make, model, variant):
+    """
+    Returns (last_label, last_boundary_start) for the highest bucket
+    that actually has data in segment_bounds for this M/M/V.
+    If no data at all, returns (None, None).
+    """
+    # Gather all labels that exist for this M/M/V
+    existing_labels = []
+    for lbl in all_labels:
+        seg = (make, model, variant, lbl)
+        if seg in segment_bounds:
+            existing_labels.append(lbl)
+    
+    if not existing_labels:
+        return None, None  # no data at all
+
+    # Among existing labels, pick the one with the highest index in all_labels
+    last_label = max(existing_labels, key=lambda x: all_labels.index(x))
+    
+    # Example: if last_label == '8-10', its index is 4 (0-based in the all_labels list)
+    idx = all_labels.index(last_label)
+    last_bucket_start = all_bins[idx]  # e.g., if label is '8-10', start is 8
+    return last_label, last_bucket_start
+
+
+
 
 # -----------------------------------------------------------------------------
 # 4) Helper function to apply clamping based on segment bounds
