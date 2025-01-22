@@ -301,7 +301,6 @@ def log1p_transform(x):
     import numpy as np
     return np.log1p(x)
 
-<<<<<<< HEAD
 # -----------------------------------------------------------------------------
 # 2) Load the model and dataset, then create buckets
 # -----------------------------------------------------------------------------
