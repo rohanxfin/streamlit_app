@@ -267,7 +267,7 @@ selected_transmission = st.sidebar.selectbox("Transmission", ['Manual', 'Automat
 selected_fuel_type = st.sidebar.selectbox("Fuel Type", ['Petrol', 'Diesel', 'CNG'])
 
 # Numeric Inputs
-age = st.sidebar.number_input("Age (years)", min_value=2, max_value=15, value=5, step=1)
+age = st.sidebar.number_input("Age (years)", min_value=2, max_value=14, value=5, step=1)
 distance = st.sidebar.number_input("Odometer Reading (km)", min_value=0, max_value=500000, value=40000, step=1000)
 
 # -----------------------------------------------------------------------------
