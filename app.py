@@ -145,9 +145,11 @@ def clamp_price(predicted_price, make, model, variant, age):
     seg = (make, model, variant, age_group)
     if seg in segment_bounds:
         clamped_val = _apply_clamping(seg, predicted_price)
+        
         # If age > last_boundary AND out-of-range → discount logic
         # but we only discount if we truly had to clamp 
         # (meaning original price was out of range).
+        
         was_clamped = (clamped_val != predicted_price)
         if age > last_boundary and was_clamped:
             # apply discount from the midpoint of the last bucket (not necessarily '10+')
@@ -156,7 +158,7 @@ def clamp_price(predicted_price, make, model, variant, age):
             base_avg = (p5 + p95) / 2
 
             years_beyond = age - last_boundary
-            discount_factor = max(1 - 0.10 * years_beyond, 0)
+            discount_factor = max(1 - 0.10 * years_beyond, 0.50)
             discounted = base_avg * discount_factor
             return discounted
         else:
@@ -201,7 +203,7 @@ def clamp_price(predicted_price, make, model, variant, age):
                 years_beyond = age - last_boundary
             else:
                 years_beyond = 0  # e.g. if last boundary is 8 but age is 7
-            discount_factor = max(1 - 0.10 * years_beyond, 0)
+            discount_factor = max(1 - 0.10 * years_beyond, 0.50)
             return base_avg * discount_factor
         else:
             return predicted_price
