@@ -312,9 +312,7 @@ def find_closest_cars():
 # 8) Run Prediction on Button Click & Display Results
 # -----------------------------------------------------------------------------
 if st.button("Predict Price"):
-    predicted_price = predict_price()
-    st.success(f"Predicted Price: ₹{round(predicted_price)}")
-    
+    predicted_price = predict_price()    
     clamped_price = clamp_price(predicted_price, selected_make, selected_model, selected_variant, age)
     st.success(f"Clamped Price: ₹{round(clamped_price)}")
     
