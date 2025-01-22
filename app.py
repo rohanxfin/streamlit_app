@@ -301,10 +301,18 @@ def log1p_transform(x):
     import numpy as np
     return np.log1p(x)
 
+<<<<<<< HEAD
 # -----------------------------------------------------------------------------
 # 2) Load the model and dataset, then create buckets
 # -----------------------------------------------------------------------------
 model = joblib.load('catboost_best_model.joblib')
+=======
+
+# Load the model
+model = joblib.load('best_model.joblib')
+
+# Load the dataset (ensure you replace 'your_dataset.csv' with the actual path to your dataset)
+>>>>>>> 67e016845b79e45bc616e584515c6ddcb5440689
 df = pd.read_csv('final_data_suzuki.csv')
 df = create_buckets(df)
 
