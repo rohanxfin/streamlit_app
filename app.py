@@ -5,346 +5,403 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # -----------------------------------------------------------------------------
-# 1) Create Logical Age Buckets
-# -----------------------------------------------------------------------------
-def create_buckets(df):
-    """
-    Assigns age groups using these bins:
-      0-2, 2-5, 5-6, 6-8, 8-10, 10+.
-    Adjust as needed, but be sure the bins and labels match in length.
-    """
-    bins = [0, 2, 5, 6, 8, 10, float('inf')]
-    labels = ['0-2', '2-5', '5-6', '6-8', '8-10', '10+']
-    df['AgeGroup'] = pd.cut(df['Age'], bins=bins, labels=labels, right=False)
-    return df
-
-
-# -----------------------------------------------------------------------------
-# Custom log1p transform (if needed in the model pipeline)
+# 1) Define Custom Transform Function
 # -----------------------------------------------------------------------------
 def log1p_transform(x):
-    import numpy as np
+    """
+    Custom log1p transform function used in the model's preprocessing pipeline.
+    """
     return np.log1p(x)
 
 # -----------------------------------------------------------------------------
-# 2) Load the model and dataset, then create buckets
+# 2) Load the Model and Dataset
 # -----------------------------------------------------------------------------
-model = joblib.load('catboost_best_model.joblib')
+MODEL_PATH = 'catboost_best_model2.joblib'
+DATASET_PATH = 'final_data_suzuki.csv'
 
-# Load the model
-model = joblib.load('best_model.joblib')
+# Load the model with proper error handling
+try:
+    model = joblib.load(MODEL_PATH)
+    if isinstance(model, str):
+        raise ValueError("Loaded model is a string. Please check the model file.")
+except AttributeError as e:
+    st.error(f"Error loading the model: {e}")
+    st.stop()
+except FileNotFoundError:
+    st.error(f"Model file not found at path: {MODEL_PATH}")
+    st.stop()
+except Exception as e:
+    st.error(f"An unexpected error occurred while loading the model: {e}")
+    st.stop()
 
-# Load the dataset (ensure you replace 'your_dataset.csv' with the actual path to your dataset)
-df = pd.read_csv('final_data_suzuki.csv')
-df = create_buckets(df)
-
-# -----------------------------------------------------------------------------
-# 3) Compute Segment Bounds (p5 and p95)
-# -----------------------------------------------------------------------------
-segment_bounds = {}   # (make, model, variant, bucket) -> (p5, p95)
-
-df = create_buckets(df)  # apply the function
-
-grouped = df.groupby(['Make', 'Model', 'Variant', 'AgeGroup'])
-for segment, group in grouped:
-    if len(group) > 5:  # ensure enough data
-        p5 = np.percentile(group['Price_numeric'], 5)
-        p95 = np.percentile(group['Price_numeric'], 95)
-        segment_bounds[segment] = (p5, p95)
-
-
-import numpy as np
-
-segment_bounds = {}   # (make, model, variant, bucket) -> (p5, p95)
-
-df = create_buckets(df)  # apply the function
-
-grouped = df.groupby(['Make', 'Model', 'Variant', 'AgeGroup'])
-for segment, group in grouped:
-    if len(group) > 5:  # ensure enough data
-        p5 = np.percentile(group['Price_numeric'], 5)
-        p95 = np.percentile(group['Price_numeric'], 95)
-        segment_bounds[segment] = (p5, p95)
-
-
-all_labels = ['0-2', '2-5', '5-6', '6-8', '8-10', '10+']
-all_bins =    [  0,    2,    5,    6,    8,   10,    float('inf') ]
-
-def get_last_available_bucket(make, model, variant):
-    """
-    Returns (last_label, last_boundary_start) for the highest bucket
-    that actually has data in segment_bounds for this M/M/V.
-    If no data at all, returns (None, None).
-    """
-    # Gather all labels that exist for this M/M/V
-    existing_labels = []
-    for lbl in all_labels:
-        seg = (make, model, variant, lbl)
-        if seg in segment_bounds:
-            existing_labels.append(lbl)
-    
-    if not existing_labels:
-        return None, None  # no data at all
-
-    # Among existing labels, pick the one with the highest index in all_labels
-    last_label = max(existing_labels, key=lambda x: all_labels.index(x))
-    
-    # Example: if last_label == '8-10', its index is 4 (0-based in the all_labels list)
-    idx = all_labels.index(last_label)
-    last_bucket_start = all_bins[idx]  # e.g., if label is '8-10', start is 8
-    return last_label, last_bucket_start
-
-
-
+# Load the dataset with proper error handling
+try:
+    df = pd.read_csv(DATASET_PATH)
+    required_columns = {'Make', 'Model', 'Variant', 'Age', 'Distance_numeric', 'Price_numeric'}
+    if not required_columns.issubset(df.columns):
+        missing = required_columns - set(df.columns)
+        st.error(f"The dataset is missing required columns: {missing}")
+        st.stop()
+except FileNotFoundError:
+    st.error(f"Dataset file not found at path: {DATASET_PATH}")
+    st.stop()
+except pd.errors.EmptyDataError:
+    st.error("The dataset file is empty.")
+    st.stop()
+except pd.errors.ParserError:
+    st.error("Error parsing the dataset file. Please check its format.")
+    st.stop()
+except Exception as e:
+    st.error(f"An unexpected error occurred while loading the dataset: {e}")
+    st.stop()
 
 # -----------------------------------------------------------------------------
-# 4) Helper function to apply clamping based on segment bounds
+# 3) Helper Functions
 # -----------------------------------------------------------------------------
-def _apply_clamping(segment, predicted):
+def get_age_bracket(age):
     """
-    Check if 'predicted' is within [p5*0.95, p95*1.05].
-    If outside, return midpoint; else return predicted.
+    Returns a label based on the age bucket.
     """
-    p5, p95 = segment_bounds[segment]
-    lb, ub = p5 * 0.95, p95 * 1.05
-    if predicted < lb or predicted > ub:
-        return (p5 + p95) / 2
-    return predicted
-
-
-def clamp_price(predicted_price, make, model, variant, age):
-    """
-    1) Find age_group from the bins (0-2, 2-5, 5-6, 6-8, 8-10, 10+).
-    2) If we have data for that bucket, clamp if out of range.
-    3) If not, fallback to neighbors (if age <= 'last' boundary).
-    4) If age is beyond the last available bucket boundary and
-       predicted price is out-of-range for that last bucket, 
-       discount per extra year (10% each year).
-    """
-    # ----------------------------------------------------
-    # Identify the age_group from the bins
-    # ----------------------------------------------------
-    bins = [0, 2, 5, 6, 8, 10, float('inf')]
-    labels = ['0-2', '2-5', '5-6', '6-8', '8-10', '10+']
-    age_group = pd.cut([age], bins=bins, labels=labels, right=False)[0]
-    if age_group is None:
-        # In case of negative or weird age
-        return predicted_price
-
-    # ----------------------------------------------------
-    # Get the last available bucket for this M/M/V
-    # ----------------------------------------------------
-    last_label, last_boundary = get_last_available_bucket(make, model, variant)
-    # If no data at all for M/M/V, we cannot clamp logically
-    if last_label is None:
-        return predicted_price  # no data => return as is
-
-    # ----------------------------------------------------
-    # 1) Attempt normal clamp in the exact age_group
-    # ----------------------------------------------------
-    seg = (make, model, variant, age_group)
-    if seg in segment_bounds:
-        clamped_val = _apply_clamping(seg, predicted_price)
-        
-        # If age > last_boundary AND out-of-range → discount logic
-        # but we only discount if we truly had to clamp 
-        # (meaning original price was out of range).
-        
-        was_clamped = (clamped_val != predicted_price)
-        if age > last_boundary and was_clamped:
-            # apply discount from the midpoint of the last bucket (not necessarily '10+')
-            last_seg = (make, model, variant, last_label)
-            p5, p95 = segment_bounds[last_seg]
-            base_avg = (p5 + p95) / 2
-
-            years_beyond = age - last_boundary
-            discount_factor = max(1 - 0.10 * years_beyond, 0.60)
-            discounted = base_avg * discount_factor
-            return discounted
-        else:
-            return clamped_val
-    # ----------------------------------------------------
-    # 2) If we have no exact bucket for the user's age_group
-    #    we can do neighbor fallback if age <= last_boundary
-    # ----------------------------------------------------
-    all_labels = ['0-2', '2-5', '5-6', '6-8', '8-10', '10+']
-    idx = all_labels.index(age_group)
-    
-    # Only do fallback if the age is not beyond the last boundary
-    # (because if it is, we want to rely on the last bucket discount logic).
-    if age <= last_boundary:
-        # Check neighbors in ascending order of distance 
-        fallback_candidates = []
-        if idx - 1 >= 0:
-            fallback_candidates.append((make, model, variant, all_labels[idx - 1]))
-        if idx + 1 < len(all_labels):
-            fallback_candidates.append((make, model, variant, all_labels[idx + 1]))
-        
-        for fb_seg in fallback_candidates:
-            if fb_seg in segment_bounds:
-                fb_clamped = _apply_clamping(fb_seg, predicted_price)
-                return fb_clamped
-    
-    # ----------------------------------------------------
-    # 3) If still nothing, or the age is beyond last boundary:
-    #    Use the "last available bucket" logic. 
-    # ----------------------------------------------------
-    # We'll see if the predicted price is out-of-range for that last bucket:
-    last_seg = (make, model, variant, last_label)
-    if last_seg in segment_bounds:
-        # Check if out-of-range => discount
-        p5, p95 = segment_bounds[last_seg]
-        lb, ub = p5 * 0.95, p95 * 1.05
-        if predicted_price < lb or predicted_price > ub:
-            # out of range => discount from midpoint
-            base_avg = (p5 + p95) / 2
-            # how many years beyond that boundary?
-            if age > last_boundary:
-                years_beyond = age - last_boundary
-            else:
-                years_beyond = 0  # e.g. if last boundary is 8 but age is 7
-            discount_factor = max(1 - 0.10 * years_beyond, 0.60)
-            return base_avg * discount_factor
-        else:
-            return predicted_price
+    if age < 3:
+        return '0-3'
+    elif age < 5:
+        return '3-5'
+    elif age < 10:
+        return '5-10'
+    elif age < 15:
+        return '10-15'
     else:
-        # truly no data for last_label => we can't clamp or discount
-        return predicted_price
+        return '15+'
 
+def get_mileage_bracket(mileage):
+    """
+    Returns a label based on the odometer bucket.
+    """
+    if mileage < 30000:
+        return '0-30k'
+    elif mileage < 60000:
+        return '30k-60k'
+    elif mileage < 100000:
+        return '60k-100k'
+    elif mileage < 150000:
+        return '100k-150k'
+    else:
+        return '150k+'
+
+def get_nearest_age_subset(df, make, model, variant, age, min_samples=5, max_delta=5):
+    """
+    Selects a subset of the dataframe based on the nearest age group.
+    Starts with the same age, then expands the range by ±1, ±2, etc., until
+    at least min_samples are found or max_delta is reached.
+    
+    Parameters:
+        df (pd.DataFrame): The entire dataset.
+        make (str): Car make.
+        model (str): Car model.
+        variant (str): Car variant.
+        age (int): Age of the car.
+        min_samples (int): Minimum number of samples required.
+        max_delta (int): Maximum range to expand the age difference.
+    
+    Returns:
+        pd.DataFrame: Subset of the dataframe based on the nearest age group.
+    """
+    subset = df[
+        (df['Make'] == make) &
+        (df['Model'] == model) &
+        (df['Variant'] == variant)
+    ]
+
+    if subset.empty:
+        return subset  # Empty subset
+
+    max_age = subset['Age'].max()
+
+    # If input age exceeds max_age, return the entire subset to handle depreciation
+    if age > max_age:
+        return subset
+
+    # Initialize delta
+    delta = 0
+    while delta <= max_delta:
+        age_min = age - delta
+        age_max = age + delta
+        # Ensure age_min is not negative
+        age_min = max(age_min, 0)
+        subset_age = subset[
+            (subset['Age'] >= age_min) &
+            (subset['Age'] <= age_max)
+        ]
+        if len(subset_age) >= min_samples:
+            return subset_age
+        delta += 1
+
+    # If not enough samples even after max_delta, return the closest possible subset
+    return subset[
+        (subset['Age'] >= max(age - max_delta, 0)) &
+        (subset['Age'] <= min(age + max_delta, max_age))
+    ]
+
+def apply_guardrails(age, distance, fuel_type, city, raw_prediction, df_subset, depreciation_rate=0.02, min_floor=50000):
+    """
+    Applies post-prediction guardrails based on:
+    1) Extreme regulatory constraints (age + fuel + city).
+    2) Subset-based percentile clamping (from the M-M-V subset).
+    3) Depreciation logic for ages beyond the dataset.
+    
+    Returns:
+       - final_price (float) if valid
+       - None if we disclaim "Cannot Predict"
+    """
+    # -------------------------------
+    # 1) Check Regulatory Constraints
+    # -------------------------------
+    if (fuel_type.lower() == 'diesel') and (age > 10) and (city.lower() == 'delhi'):
+        return None  # Disclaim
+
+    if (fuel_type.lower() == 'petrol') and (age > 15) and (city.lower() == 'delhi'):
+        return None  # Disclaim
+
+    # -------------------------------
+    # 2) Determine Maximum Age in Subset
+    # -------------------------------
+    max_age_in_subset = df_subset['Age'].max()
+    price_at_max_age = df_subset[df_subset['Age'] == max_age_in_subset]['Price_numeric'].mean()
+
+    # -------------------------------
+    # 3) Apply Clamping or Depreciation
+    # -------------------------------
+    if age <= max_age_in_subset:
+        # Age within the dataset range: Apply percentile clamping
+        if len(df_subset) >= 5:  # Require at least 5 samples for reliable percentiles
+            p5, p95 = np.percentile(df_subset['Price_numeric'], [5, 95])
+            lower_bound = p5 * 0.95
+            upper_bound = p95 * 1.05
+            if lower_bound <= raw_prediction <= upper_bound:
+                clamped_price = raw_prediction
+            else:
+                clamped_price = (p5 + p95) / 2
+        else:
+            # Fallback if the subset is too small
+            clamped_price = max(raw_prediction, min_floor)
+    else:
+        # Age exceeds the dataset range: Apply depreciation
+        years_beyond = age - max_age_in_subset
+        depreciated_price = price_at_max_age * ((1 - depreciation_rate) ** years_beyond)
+        clamped_price = depreciated_price
+
+    # -------------------------------
+    # 4) Enforce Minimum Floor
+    # -------------------------------
+    final_price = max(clamped_price, min_floor)
+    return final_price
+
+def find_closest_cars(make, model, variant, age, distance, df):
+    """
+    Returns up to 5 closest cars in the dataset based on the same M-M-V.
+    """
+    filtered = df[
+        (df['Make'] == make) &
+        (df['Model'] == model) &
+        (df['Variant'] == variant)
+    ]
+
+    if filtered.empty:
+        return pd.DataFrame()
+
+    filtered = filtered.copy()
+    filtered['Age_Diff'] = abs(filtered['Age'] - age)
+    filtered['Odom_Diff'] = abs(filtered['Distance_numeric'] - distance)
+    closest_cars = filtered.sort_values(by=['Age_Diff', 'Odom_Diff']).head(5)
+    return closest_cars[['Make', 'Model', 'Variant', 'Age', 'Distance_numeric', 'Price_numeric']]
 
 # -----------------------------------------------------------------------------
-# 6) Streamlit Application Layout and Inputs
+# 4) Streamlit Application Layout and Inputs
 # -----------------------------------------------------------------------------
-st.title("Used Car Price Prediction App")
+st.title("Used Car Price Prediction App (M-M-V Guardrails)")
 st.write("""
 This application predicts the price of a used car based on various features.
-Please fill in the details on the left sidebar and click 'Predict Price'.
+**Guardrails** are derived **per Make-Model-Variant (M-M-V)** subset to clamp unrealistic values.
+For cars older than the dataset's maximum age for their M-M-V, a constant depreciation rate is applied.
 """)
 
 # Sidebar Inputs
 st.sidebar.header("Enter the Car Features")
 
+# Example dictionary of {Model: [Variant...]}
 d = {
-    'Alto 800': ['LXi', 'Lx[2012-2016]', 'VXi'],
-    'Baleno': ['Alpha 1.2[2015-2019]', 'Alpha[2019-2022]', 'Delta 1.2[2015-2019]', 'Zeta 1.2[2015-2019]', 'Zeta[2019-2022]'],
-    'Brezza': ['ZXi'],
-    'Celerio': ['VXi', 'ZXi'],
-    'Ciaz': ['Alpha 1.4 AT[2017-2018]', 'Alpha Hybrid 1.5 AT [2018-2020]', 'VXi[2014-2017]', 'ZXI+[2014-2017]', 'ZXi[2014-2017]'],
-    'Eeco': ['5 STR[2010-2022]'],
-    'Ertiga': ['VDI SHVS[2015-2018]', 'VXI[2015-2018]', 'VXi[2018-2022]', 'ZXi[2018-2022]'],
-    'Ignis': ['Delta 1.2 MT'],
-    'S-Cross': ['Zeta 1.3[2014-2017]'],
-    'S-Presso': ['VXi'],
-    'Swift DZire': ['VDI[2011-2015]', 'VXI[2011-2015]'],
-    'Swift': ['LXi', 'VDi[2014-2018]', 'VXi', 'VXi AMT', 'ZDi[2014-2018]', 'ZXi'],
+    'Eeco': ['5 STR[2010-2022]', '5 STR AC'],
+    'Baleno': ['Alpha[2019-2022]', 'Alpha 1.2[2015-2019]', 'Delta 1.2[2015-2019]',
+               'Delta 1.3[2015-2019]', 'Delta MT', 'Zeta[2019-2022]', 'Zeta 1.2[2015-2019]'],
+    'Ciaz': ['Alpha 1.4 AT[2017-2018]', 'Alpha 1.4 MT[2017-2018]',
+             'Alpha Hybrid 1.5 AT [2018-2020]', 'Alpha Hybrid 1.5 [2018-2020]',
+             'VDi+ SHVS[2014-2017]', 'VXi[2014-2017]', 'ZDi+ SHVS[2014-2017]',
+             'ZXI+[2014-2017]', 'ZXi[2014-2017]', 'Zeta 1.4 AT[2017-2018]'],
+    'XL6': ['Alpha AT Petrol', 'Alpha MT Petrol', 'Zeta MT Petrol'],
+    'Ignis': ['Delta 1.2 MT', 'Zeta 1.2 AMT'],
+    'Swift DZire': ['LDI[2011-2015]', 'VDI[2011-2015]', 'VXI[2011-2015]'],
     'Vitara Brezza': ['VDi[2016-2020]', 'ZDi[2016-2020]'],
-    'Wagon R': ['LXI 1.0', 'LXI 1.0 CNG', 'VXI 1.0'],
-    'XL6': ['Zeta MT Petrol']
+    'Swift': ['LXi', 'VDi[2014-2018]', 'VXi', 'ZDi[2014-2018]', 'ZXi',
+              'VXi AMT', 'VDi[2011-2014]'],
+    'Alto 800': ['Lx[2012-2016]', 'VXi', 'LXi'],
+    'Ertiga': ['VDI SHVS[2015-2018]', 'VDi[2012-2015]', 'VXi[2018-2022]',
+               'VXI[2015-2018]', 'ZDI + SHVS[2015-2018]', 'ZDi[2012-2015]',
+               'ZXi[2018-2022]', 'VXi'],
+    'S-Presso': ['VXi'],
+    'Alto K10': ['VXi'],
+    'Celerio': ['VXi', 'ZXi'],
+    'Brezza': ['ZXi'],
+    'S-Cross': ['Zeta 1.3[2014-2017]'],
+    'Wagon R': ['VXI 1.0', 'LXI 1.0', 'LXI 1.0 CNG'],
+    'Dzire': ['VXi']
 }
 
 makes = ["Maruti Suzuki"]
-selected_make = st.sidebar.selectbox("Select Make", makes)
+selected_make = st.sidebar.selectbox("Make", makes)
 
-# Get models (keys of the dictionary)
 models = sorted(d.keys())
-selected_model = st.sidebar.selectbox("Select Model", models)
+selected_model = st.sidebar.selectbox("Model", models)
 
-# Get variants for the selected model
 variants = sorted(d[selected_model])
-selected_variant = st.sidebar.selectbox("Select Variant", variants)
+selected_variant = st.sidebar.selectbox("Variant", variants)
 
-# Other Inputs
 selected_city = st.sidebar.selectbox(
     "City",
-    ['Ahmedabad', 'Bangalore', 'Chennai', 'Gurgaon', 'Hyderabad', 'Kolkata',
-     'Pune', 'Delhi', 'Panchkula', 'Ludhiana', 'Kharar', 'Coimbatore',
-     'Noida', 'Ghaziabad', 'Lucknow', 'Mumbai', 'Thane', 'Mohali',
-     'Kharagpur', 'Chandigarh', 'Ambala', 'Navi', 'Faridabad', 'Meerut',
-     'Sangli', 'Surat', 'Mysore', 'Gulbarga', 'Ranga', 'Vadodara', 'Howrah']
+    [
+        'Ahmedabad', 'Bangalore', 'Chennai', 'Gurgaon', 'Hyderabad', 'Kolkata',
+        'Pune', 'Delhi', 'Panchkula', 'Ludhiana', 'Kharar', 'Coimbatore',
+        'Noida', 'Ghaziabad', 'Lucknow', 'Mumbai', 'Thane', 'Mohali',
+        'Kharagpur', 'Chandigarh', 'Ambala', 'Navi', 'Faridabad', 'Meerut',
+        'Sangli', 'Surat', 'Mysore', 'Gulbarga', 'Ranga', 'Vadodara', 'Howrah'
+    ]
 )
 
 selected_transmission = st.sidebar.selectbox("Transmission", ['Manual', 'Automatic'])
 selected_fuel_type = st.sidebar.selectbox("Fuel Type", ['Petrol', 'Diesel', 'CNG'])
 
 # Numeric Inputs
-age = st.sidebar.number_input("Age (years)", min_value=2, max_value=14, value=5, step=1)
+age = st.sidebar.number_input("Age (years)", min_value=0, max_value=50, value=5, step=1)
 distance = st.sidebar.number_input("Odometer Reading (km)", min_value=0, max_value=500000, value=40000, step=1000)
 
+# Dynamic ± range slider
+range_percentage = st.sidebar.slider("Confidence Range (%)", 1, 20, 5)
+
 # -----------------------------------------------------------------------------
-# 7) Prediction Functions
+# 5) Prediction Function
 # -----------------------------------------------------------------------------
-def predict_price():
-    # Compute distance_per_year
-    distance_per_year = np.round(distance / (age + 1))
-    
-    # Prepare input data DataFrame
+def predict_price(age, distance, make, car_model, variant, city, transmission, fuel_type):
+    """
+    Get raw model prediction for the user input.
+    """
+    # Avoid division by zero
+    distance_per_year = (distance / (age + 1)) if (age + 1) else distance
+
     input_data = pd.DataFrame([{
-        'Model': selected_model,
-        'Transmission': selected_transmission,
-        'Fuel Type': selected_fuel_type,
-        'City': selected_city,
+        'Model': car_model,
+        'Transmission': transmission,
+        'Fuel Type': fuel_type,
+        'City': city,
         'Distance_numeric': distance,
         'Age': age,
-        'Distance_per_year': distance_per_year,
-        'Variant': selected_variant
+        'Distance_per_year': np.round(distance_per_year, 2),
+        'Variant': variant
     }])
-    
-    prediction = model.predict(input_data)
-    return prediction[0]
 
-def find_closest_cars():
-    # Filter dataset for the same Make, Model, Variant
-    filtered_data = df[
-        (df['Make'] == selected_make) &
-        (df['Model'] == selected_model) &
-        (df['Variant'] == selected_variant)
-    ]
-    
-    if filtered_data.empty:
-        return pd.DataFrame()
-    
-    filtered_data['Age Difference'] = abs(filtered_data['Age'] - age)
-    filtered_data['Distance Difference'] = abs(filtered_data['Distance_numeric'] - distance)
-    closest_cars = filtered_data.sort_values(by=['Age Difference', 'Distance Difference']).head(5)
-    return closest_cars[['Make', 'Model', 'Variant', 'Age', 'Distance_numeric', 'Price_numeric']]
+    try:
+        raw_pred = model.predict(input_data)
+    except Exception as e:
+        st.error(f"Error during prediction: {e}")
+        return None
+
+    return raw_pred[0]
 
 # -----------------------------------------------------------------------------
-# 8) Run Prediction on Button Click & Display Results
+# 6) Main Button: Generate Prediction & Apply Guardrails
 # -----------------------------------------------------------------------------
 if st.button("Predict Price"):
-    predicted_price = predict_price()    
-    clamped_price = clamp_price(predicted_price, selected_make, selected_model, selected_variant, age)
-    st.success(f"Clamped Price: ₹{round(clamped_price)}")
-    
-    lower_bound = clamped_price * 0.95
-    upper_bound = clamped_price * 1.15
-    st.write(f"Price Range (±5%): ₹{round(lower_bound)} - ₹{round(upper_bound)}")
-    
-    closest_cars = find_closest_cars()
-    if closest_cars.empty:
-        st.write("No similar cars found in the dataset.")
+    raw_price = predict_price(
+        age=age,
+        distance=distance,
+        make=selected_make,
+        car_model=selected_model,  # Renamed parameter to avoid shadowing
+        variant=selected_variant,
+        city=selected_city,
+        transmission=selected_transmission,
+        fuel_type=selected_fuel_type
+    )
+
+    if raw_price is None:
+        st.error("An error occurred during prediction. Please check your inputs.")
     else:
-        st.write("Closest Cars (based on age and odometer reading):")
-        st.dataframe(closest_cars)
-    
-    # Plotting
-    filtered_data = df[
-        (df['Make'] == selected_make) &
-        (df['Model'] == selected_model) &
-        (df['Variant'] == selected_variant)
-    ]
-    
-    if not filtered_data.empty:
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.scatter(filtered_data['Age'], filtered_data['Price_numeric'],
-                   color='blue', label='Cars of Same MMV', alpha=0.7)
-        ax.scatter(age, clamped_price, color='red', label='Predicted Car', s=100, zorder=5)
-        ax.fill_between(x=[0, 15], y1=lower_bound, y2=upper_bound,
-                        color='lightgreen', alpha=0.3, label='Predicted Price Range (±5%)')
-        ax.set_xlabel("Age (Years)")
-        ax.set_ylabel("Price (₹)")
-        ax.set_title(f"Age vs. Price for {selected_make} {selected_model} {selected_variant}")
-        ax.legend()
-        st.pyplot(fig)
-    else:
-        st.write("No data available for the selected Make, Model, and Variant.")
+        # Select subset based on nearest age group
+        subset_mmv = get_nearest_age_subset(
+            df=df,
+            make=selected_make,
+            model=selected_model,
+            variant=selected_variant,
+            age=age,
+            min_samples=5,   # Minimum required samples
+            max_delta=5      # Maximum age difference to consider
+        )
+
+        if subset_mmv.empty:
+            st.error("No data available for the selected Make-Model-Variant.")
+        else:
+            # Apply guardrails with the M-M-V subset
+            guarded_price = apply_guardrails(
+                age=age,
+                distance=distance,
+                fuel_type=selected_fuel_type,
+                city=selected_city,
+                raw_prediction=raw_price,
+                df_subset=subset_mmv,
+                depreciation_rate=0.02,  # 2% depreciation rate per year beyond max age
+                min_floor=40000           # ₹40,000 minimum floor
+            )
+
+            if guarded_price is None:
+                st.error("Cannot predict a valid price for this vehicle under current regulations/constraints.")
+            else:
+                st.success(f"Predicted Price (Post-Guardrail): ₹{round(guarded_price)}")
+
+                # Calculate dynamic ± range
+                lower_bound = guarded_price * (1 - range_percentage / 100)
+                upper_bound = guarded_price * (1 + range_percentage / 100)
+                st.write(f"Price Range (±{range_percentage}%): ₹{round(lower_bound)} - ₹{round(upper_bound)}")
+
+                # Show closest cars in the same M-M-V
+                similar_cars = find_closest_cars(selected_make, selected_model, selected_variant, age, distance, df)
+                if similar_cars.empty:
+                    st.write("No similar cars found in the dataset for this M-M-V.")
+                else:
+                    st.write("Closest Cars (based on Age & Odometer):")
+                    st.dataframe(similar_cars)
+
+                # Optional: Plot Age vs. Price for M-M-V subset
+                if not subset_mmv.empty:
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    ax.scatter(subset_mmv['Age'], subset_mmv['Price_numeric'],
+                               color='blue', alpha=0.7, label='Dataset Cars (Same M-M-V)')
+                    ax.scatter(age, guarded_price, color='red', s=100, zorder=5, label='Predicted Car')
+
+                    # Determine x-axis range for the plot
+                    plot_max_age = max(subset_mmv['Age'].max(), age) + 5
+                    plot_x = np.linspace(0, plot_max_age, 100)
+
+                    # Shade the ± range
+                    ax.fill_between(
+                        x=plot_x,
+                        y1=lower_bound,
+                        y2=upper_bound,
+                        color='lightgreen', alpha=0.2,
+                        label=f"±{range_percentage}% Range"
+                    )
+
+                    ax.set_xlim(0, plot_max_age)
+                    ax.set_xlabel("Age (Years)")
+                    ax.set_ylabel("Price (₹)")
+                    ax.set_title(f"Age vs. Price for {selected_make} {selected_model} {selected_variant}")
+                    ax.legend()
+                    st.pyplot(fig)
+                else:
+                    st.write("No data to plot for this M-M-V subset.")
