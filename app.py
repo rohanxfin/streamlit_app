@@ -463,7 +463,7 @@ if st.button("Predict Price"):
                     fig, ax = plt.subplots(figsize=(8, 6))
                     ax.scatter(subset_mmv['Age'], subset_mmv['Price_numeric'],
                                color='blue', alpha=0.7, label='Dataset Cars (Same M-M-V)')
-                    ax.scatter(age, guarded_price, color='red', s=100, zorder=5, label='Predicted Car')
+                    ax.scatter(age, guarded_price, color='red', s=100, zorder=5,marker = "*" , label='Predicted Car')
 
                     # Determine x-axis range for the plot
                     plot_max_age = max(subset_mmv['Age'].max(), age) + 5
