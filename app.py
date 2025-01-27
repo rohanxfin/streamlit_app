@@ -16,8 +16,8 @@ def log1p_transform(x):
 # -----------------------------------------------------------------------------
 # 2) Load the Model and Dataset
 # -----------------------------------------------------------------------------
-MODEL_PATH = 'catboost_best_model2.joblib'
-DATASET_PATH = 'final_data_suzuki.csv'
+MODEL_PATH = 'hybrid_model_for_hyundai_and_suzuki.joblib'
+DATASET_PATH = 'refrence_data.csv'
 
 # Load the model with proper error handling
 try:
@@ -228,42 +228,118 @@ For cars older than the dataset's maximum age for their M-M-V, a constant deprec
 # Sidebar Inputs
 st.sidebar.header("Enter the Car Features")
 
-# Example dictionary of {Model: [Variant...]}
-d = {
-    'Eeco': ['5 STR[2010-2022]', '5 STR AC'],
-    'Baleno': ['Alpha[2019-2022]', 'Alpha 1.2[2015-2019]', 'Delta 1.2[2015-2019]',
-               'Delta 1.3[2015-2019]', 'Delta MT', 'Zeta[2019-2022]', 'Zeta 1.2[2015-2019]'],
-    'Ciaz': ['Alpha 1.4 AT[2017-2018]', 'Alpha 1.4 MT[2017-2018]',
-             'Alpha Hybrid 1.5 AT [2018-2020]', 'Alpha Hybrid 1.5 [2018-2020]',
-             'VDi+ SHVS[2014-2017]', 'VXi[2014-2017]', 'ZDi+ SHVS[2014-2017]',
-             'ZXI+[2014-2017]', 'ZXi[2014-2017]', 'Zeta 1.4 AT[2017-2018]'],
-    'XL6': ['Alpha AT Petrol', 'Alpha MT Petrol', 'Zeta MT Petrol'],
-    'Ignis': ['Delta 1.2 MT', 'Zeta 1.2 AMT'],
-    'Swift DZire': ['LDI[2011-2015]', 'VDI[2011-2015]', 'VXI[2011-2015]'],
-    'Vitara Brezza': ['VDi[2016-2020]', 'ZDi[2016-2020]'],
-    'Swift': ['LXi', 'VDi[2014-2018]', 'VXi', 'ZDi[2014-2018]', 'ZXi',
-              'VXi AMT', 'VDi[2011-2014]'],
-    'Alto 800': ['Lx[2012-2016]', 'VXi', 'LXi'],
-    'Ertiga': ['VDI SHVS[2015-2018]', 'VDi[2012-2015]', 'VXi[2018-2022]',
-               'VXI[2015-2018]', 'ZDI + SHVS[2015-2018]', 'ZDi[2012-2015]',
-               'ZXi[2018-2022]', 'VXi'],
-    'S-Presso': ['VXi'],
-    'Alto K10': ['VXi'],
-    'Celerio': ['VXi', 'ZXi'],
-    'Brezza': ['ZXi'],
-    'S-Cross': ['Zeta 1.3[2014-2017]'],
-    'Wagon R': ['VXI 1.0', 'LXI 1.0', 'LXI 1.0 CNG'],
-    'Dzire': ['VXi']
-}
 
-makes = ["Maruti Suzuki"]
-selected_make = st.sidebar.selectbox("Make", makes)
+d = {'Hyundai': {'i20 Active': ['1.2 S'],
+  'Creta': ['1.4 S[2015-2017]',
+   '1.6 S Petrol[2015-2017]',
+   '1.6 SX[2015-2017]',
+   'E Plus 1.4 CRDI[2017-2018]',
+   'E Plus 1.6 Petrol[2017-2018]',
+   'SX (O) 1.4 Turbo 7 DCT[2020-2023]',
+   'SX 1.5 Diesel[2020-2023]',
+   'SX 1.6 AT CRDi[2018-2019]',
+   'SX 1.6 AT Petrol[2018-2019]',
+   'SX 1.6 CRDi[2018-2019]',
+   'SX 1.6 Petrol[2018-2019]',
+   'SX Plus 1.6  Petrol[2017-2018]',
+   'SX Plus 1.6 AT CRDI[2017-2018]',
+   '1.6 SX Plus AT Petrol[2015-2017]'],
+  'Elite i20': ['Asta 1.2[2017-2018]',
+   'Asta 1.2[2014-2015]',
+   'Magna 1.2[2014-2015]',
+   'Sportz 1.2[2017-2018]',
+   'Sportz 1.2[2019-2020]',
+   'Sportz 1.2[2014-2015]'],
+  'Grand i10': ['Asta 1.2 Kappa VTVT',
+   'Asta AT 1.2 Kappa VTVT (O) [2016-2017][2013-2017]',
+   'Asta AT 1.2 Kappa VTVT [2013-2016][2013-2017]',
+   'Magna 1.2 Kappa VTVT',
+   'Sports Edition 1.2L Kappa VTVT[2013-2017]',
+   'Sportz (O) 1.2 Kappa VTVT [2017-2018]',
+   'Sportz (O) AT 1.2 Kappa VTVT [2017-2018]',
+   'Sportz 1.2 Kappa VTVT'],
+  'Xcent': ['E'],
+  'Eon': ['Era +', 'Magna +'],
+  'Santro': ['Magna', 'Sportz'],
+  'i20': ['Magna 1.2[2012-2014]', 'Asta 1.2 MT', 'Sportz 1.2 MT'],
+  'Venue': ['S 1.2 Petrol',
+   'SX 1.0 Turbo',
+   'SX 1.5 CRDi',
+   'SX Plus 1.0 Turbo DCT'],
+  'Aura': ['S 1.2 CNG'],
+  'i10': ['Sportz 1.1 iRDE2 [2010--2017][2010-2017]', 'Sportz 1.2[2007-2010]'],
+  'Verna': ['i[2006-2010]']},
+ 'Maruti Suzuki': {'Eeco': ['5 STR[2010-2022]', '5 STR AC'],
+  'Baleno': ['Alpha[2019-2022]',
+   'Alpha 1.2[2015-2019]',
+   'Delta 1.2[2015-2019]',
+   'Delta 1.3[2015-2019]',
+   'Delta MT',
+   'Zeta[2019-2022]',
+   'Zeta 1.2[2015-2019]'],
+  'Ciaz': ['Alpha 1.4 AT[2017-2018]',
+   'Alpha 1.4 MT[2017-2018]',
+   'Alpha Hybrid 1.5 AT [2018-2020]',
+   'Alpha Hybrid 1.5 [2018-2020]',
+   'VDi+ SHVS[2014-2017]',
+   'VXi[2014-2017]',
+   'ZDi+ SHVS[2014-2017]',
+   'ZXI+[2014-2017]',
+   'ZXi[2014-2017]',
+   'Zeta 1.4 AT[2017-2018]'],
+  'XL6': ['Alpha AT Petrol', 'Alpha MT Petrol', 'Zeta MT Petrol'],
+  'Ignis': ['Delta 1.2 MT', 'Zeta 1.2 AMT'],
+  'Swift DZire': ['LDI[2011-2015]', 'VDI[2011-2015]', 'VXI[2011-2015]'],
+  'Vitara Brezza': ['VDi[2016-2020]', 'ZDi[2016-2020]'],
+  'Swift': ['LXi',
+   'VDi[2014-2018]',
+   'VXi',
+   'ZDi[2014-2018]',
+   'ZXi',
+   'VXi AMT',
+   'VDi[2011-2014]'],
+  'Alto 800': ['Lx[2012-2016]', 'VXi', 'LXi'],
+  'Ertiga': ['VDI SHVS[2015-2018]',
+   'VDi[2012-2015]',
+   'VXi[2018-2022]',
+   'VXI[2015-2018]',
+   'ZDI + SHVS[2015-2018]',
+   'ZDi[2012-2015]',
+   'ZXi[2015-2018]',
+   'ZXi[2018-2022]',
+   'VXi'],
+  'S-Presso': ['VXi'],
+  'Alto K10': ['VXi'],
+  'Celerio': ['VXi', 'ZXi'],
+  'Brezza': ['ZXi'],
+  'S-Cross': ['Zeta 1.3[2014-2017]'],
+  'Wagon R': ['VXI 1.0', 'LXI 1.0', 'LXI 1.0 CNG'],
+  'Dzire': ['VXi']}}
 
-models = sorted(d.keys())
-selected_model = st.sidebar.selectbox("Model", models)
 
-variants = sorted(d[selected_model])
-selected_variant = st.sidebar.selectbox("Variant", variants)
+selected_make = st.sidebar.selectbox("Select Make", options=list(d.keys()))
+
+if selected_make:
+    selected_model = st.sidebar.selectbox("Select Model", options=list(d[selected_make].keys()))
+else:
+    selected_model = None
+
+# Dropdown for 'Variant' based on the selected 'Model'
+if selected_model:
+    selected_variant = st.sidebar.selectbox("Select Variant", options=d[selected_make][selected_model])
+else:
+    selected_variant = None
+
+
+
+# makes = ["Maruti Suzuki"]
+# selected_make = st.sidebar.selectbox("Make", makes)
+
+# models = sorted(d.keys())
+# selected_model = st.sidebar.selectbox("Model", models)
+
+# variants = sorted(d[selected_model])
+# selected_variant = st.sidebar.selectbox("Variant", variants)
 
 selected_city = st.sidebar.selectbox(
     "City",
@@ -297,6 +373,7 @@ def predict_price(age, distance, make, car_model, variant, city, transmission, f
     distance_per_year = (distance / (age + 1)) if (age + 1) else distance
 
     input_data = pd.DataFrame([{
+        'Make': make,
         'Model': car_model,
         'Transmission': transmission,
         'Fuel Type': fuel_type,
@@ -333,6 +410,8 @@ if st.button("Predict Price"):
     if raw_price is None:
         st.error("An error occurred during prediction. Please check your inputs.")
     else:
+
+        st.success(f"Predicted Price without guardrails: : ₹{round(raw_price)}")
         # Select subset based on nearest age group
         subset_mmv = get_nearest_age_subset(
             df=df,
@@ -346,6 +425,8 @@ if st.button("Predict Price"):
 
         if subset_mmv.empty:
             st.error("No data available for the selected Make-Model-Variant.")
+            st.success(f"Predicted Price: {raw_price}")
+
         else:
             # Apply guardrails with the M-M-V subset
             guarded_price = apply_guardrails(
@@ -355,7 +436,7 @@ if st.button("Predict Price"):
                 city=selected_city,
                 raw_prediction=raw_price,
                 df_subset=subset_mmv,
-                depreciation_rate=0.02,  # 2% depreciation rate per year beyond max age
+                depreciation_rate=0.04,  # 2% depreciation rate per year beyond max age
                 min_floor=40000           # ₹40,000 minimum floor
             )
 
