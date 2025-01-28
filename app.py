@@ -464,7 +464,7 @@ if st.button("Predict Price"):
 
                 # Optional: Plot Age vs. Price for M-M-V subset
                 if not subset_mmv.empty:
-                    fig, ax = plt.subplots(figsize=(8, 6))
+                    fig, ax = plt.subplots(figsize=(10, 8))
                     
                     # ax.scatter(subset_mmv['Age'], subset_mmv['Price_numeric'],
                     #            color='blue', alpha=0.7, label='Dataset Cars (Same M-M-V)')
