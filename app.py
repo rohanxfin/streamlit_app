@@ -455,21 +455,26 @@ if st.button("Predict Price"):
                 if similar_cars.empty:
                     st.write("No similar cars found in the dataset for this M-M-V.")
                 else:
-                    st.write("Closest Cars (based on Age & Odometer):")
                     car_count = len(df[(df['Make'] == selected_make) & 
                                    (df['Model'] == selected_model) & 
                                    (df['Variant'] == selected_variant)])
                     st.write(f"Total data points for {selected_make} {selected_model} {selected_variant}: {car_count}")
-
+                    st.write("Closest Cars (based on Age & Odometer):")
                     st.dataframe(similar_cars)
 
                 # Optional: Plot Age vs. Price for M-M-V subset
                 if not subset_mmv.empty:
                     fig, ax = plt.subplots(figsize=(8, 6))
                     
-                    ax.scatter(subset_mmv['Age'], subset_mmv['Price_numeric'],
-                               color='blue', alpha=0.7, label='Dataset Cars (Same M-M-V)')
+                    # ax.scatter(subset_mmv['Age'], subset_mmv['Price_numeric'],
+                    #            color='blue', alpha=0.7, label='Dataset Cars (Same M-M-V)')
 
+                    ax.scatter(df[(df['Make'] == selected_make) & 
+                                   (df['Model'] == selected_model) & 
+                                   (df['Variant'] == selected_variant)]['Age'] , 
+                               df[(df['Make'] == selected_make) & 
+                                   (df['Model'] == selected_model) & 
+                                   (df['Variant'] == selected_variant)]['Price_numeric']  , color = 'blue' ,  alpha=0.7, label='Dataset Cars (Same M-M-V)')
 
                     
                     ax.scatter(age, guarded_price, color='red', s=100, zorder=5,marker = "*" , label='Predicted Car')
