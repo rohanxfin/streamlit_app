@@ -467,16 +467,9 @@ if st.button("Predict Price"):
                 if not subset_mmv.empty:
                     fig, ax = plt.subplots(figsize=(8, 6))
                     
-                    # ax.scatter(subset_mmv['Age'], subset_mmv['Price_numeric'],
-                    #            color='blue', alpha=0.7, label='Dataset Cars (Same M-M-V)')
+                    ax.scatter(subset_mmv['Age'], subset_mmv['Price_numeric'],
+                               color='blue', alpha=0.7, label='Dataset Cars (Same M-M-V)')
 
-                    ax.scatter(df[df['Make'] == selected_make & 
-                                  df['Model'] == selected_model & 
-                                  df['Variant'] == selected_variant]['Age'], 
-                               df[df['Make'] == selected_make & 
-                                  df['Model'] == selected_model & 
-                                  df['Variant'] == selected_variant]['Price_numeric'],
-                               color='lightblue', alpha=0.5, label='All Cars (Same M-M-V)')
 
                     
                     ax.scatter(age, guarded_price, color='red', s=100, zorder=5,marker = "*" , label='Predicted Car')
@@ -498,12 +491,7 @@ if st.button("Predict Price"):
                     ax.set_xlabel("Age (Years)")
                     ax.set_ylabel("Price (₹)")
                     ax.set_title(f"Age vs. Price for {selected_make} {selected_model} {selected_variant}")
-                    # ax.legend()
-                    st.write("Details:")
-                    st.write("- Blue points: Dataset cars (same Make-Model-Variant)")
-                    st.write("- Light blue points: All cars of the selected Make-Model-Variant")
-                    st.write(f"- Red star: Predicted car ({age} years, ₹{round(guarded_price)})")
-                    st.write(f"- Light green shaded area: Price range (±{range_percentage}%)") 
+                    ax.legend()
 
                     st.pyplot(fig)
                 else:
