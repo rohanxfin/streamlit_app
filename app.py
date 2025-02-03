@@ -46,6 +46,10 @@ age = st.sidebar.number_input("Age (years)", min_value=0, max_value=50, value=5,
 distance = st.sidebar.number_input("Odometer Reading (km)", min_value=0, max_value=500000, value=40000, step=1000)
 range_percentage = st.sidebar.slider("Confidence Range (%)", 1, 20, 5)
 
+st.write("### Copy the below line to paste in Google Sheets:")
+st.write(f"Make,Model,Variant,Age,km")
+st.write(f"{selected_make},{selected_model},{selected_variant},{age},{distance}")
+
 # --------------
 # Main Button: Prediction & Guardrails
 # --------------
@@ -64,13 +68,6 @@ if st.button("Predict Price"):
             transmission=selected_transmission,
             fuel_type=selected_fuel_type
         )
-
-        st.success(make)
-        st.success(car_model)
-        st.success(variant)
-        st.success(city)
-        st.success(age)
-        st.success(distance)
 
 
         if not raw_predictions:
