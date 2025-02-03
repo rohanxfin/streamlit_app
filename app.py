@@ -101,6 +101,7 @@ if st.button("Predict Price"):
                 if guarded_price is None:
                     st.error("Cannot predict a valid price under current regulations/constraints.")
                 else:
+<<<<<<< HEAD
                     st.success(f"Guarded Average Predicted Price: ₹{round(guarded_price)}")
                     lower_bound = guarded_price * (1 - range_percentage / 100)
                     upper_bound = guarded_price * (1 + range_percentage / 100)
@@ -119,8 +120,58 @@ if st.button("Predict Price"):
                     ax.scatter(mmv_subset['Age'], mmv_subset['Price_numeric'], color='blue', alpha=0.5, label='Dataset Cars (Same M-M-V)')
                     ax.scatter(age, guarded_price, color='purple', s=200, marker='*', label='Guarded Average Prediction')
                     ax.fill_between([age - 1, age + 1], lower_bound, upper_bound, color='lightgreen', alpha=0.2, label=f"±{range_percentage}% Range")
+=======
+                    car_count = len(df[(df['Make'] == selected_make) & 
+                                   (df['Model'] == selected_model) & 
+                                   (df['Variant'] == selected_variant)])
+                    st.write(f"Total data points for {selected_make} {selected_model} {selected_variant}: {car_count}")
+                    st.write("Closest Cars (based on Age & Odometer):")
+                    st.dataframe(similar_cars)
+
+                # Optional: Plot Age vs. Price for M-M-V subset
+                if not subset_mmv.empty:
+                    fig, ax = plt.subplots(figsize=(10, 8))
+                    
+                    # ax.scatter(subset_mmv['Age'], subset_mmv['Price_numeric'],
+                    #            color='blue', alpha=0.7, label='Dataset Cars (Same M-M-V)')
+
+                    ax.scatter(df[(df['Make'] == selected_make) & 
+                                   (df['Model'] == selected_model) & 
+                                   (df['Variant'] == selected_variant)]['Age'] , 
+                               df[(df['Make'] == selected_make) & 
+                                   (df['Model'] == selected_model) & 
+                                   (df['Variant'] == selected_variant)]['Price_numeric']  , color = 'blue' ,  alpha=0.7, label='Dataset Cars (Same M-M-V)')
+
+                    
+                    ax.scatter(age, guarded_price, color='red', s=100, zorder=5,marker = "*" , label='Predicted Car')
+
+                    # Determine x-axis range for the plot
+                    plot_max_age = max(subset_mmv['Age'].max(), age) + 5
+                    plot_x = np.linspace(0, plot_max_age, 100)
+
+                    # Shade the ± range
+                    ax.fill_between(
+                        x=plot_x,
+                        y1=lower_bound,
+                        y2=upper_bound,
+                        color='lightgreen', alpha=0.2,
+                        label=f"±{range_percentage}% Range"
+                    )
+
+                    ax.set_xlim(0, plot_max_age)
+>>>>>>> 7a9ddb136001b7fc66adfea54ff1b424eec04d92
                     ax.set_xlabel("Age (Years)")
                     ax.set_ylabel("Price (₹)")
                     ax.set_title(f"Age vs. Price for {selected_make} {selected_model} {selected_variant}")
                     ax.legend()
+
                     st.pyplot(fig)
+<<<<<<< HEAD
+=======
+                else:
+                    st.write("No data to plot for this M-M-V subset.")
+
+
+
+
+>>>>>>> 7a9ddb136001b7fc66adfea54ff1b424eec04d92
