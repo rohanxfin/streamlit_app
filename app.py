@@ -65,6 +65,14 @@ if st.button("Predict Price"):
             fuel_type=selected_fuel_type
         )
 
+        st.success(make)
+        st.success(car_model)
+        st.success(variant)
+        st.success(city)
+        st.success(age)
+        st.success(distance)
+
+
         if not raw_predictions:
             st.error("An error occurred during prediction. Please check your inputs.")
         else:
