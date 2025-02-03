@@ -101,7 +101,6 @@ if st.button("Predict Price"):
                 if guarded_price is None:
                     st.error("Cannot predict a valid price under current regulations/constraints.")
                 else:
-<<<<<<< HEAD
                     st.success(f"Guarded Average Predicted Price: ₹{round(guarded_price)}")
                     lower_bound = guarded_price * (1 - range_percentage / 100)
                     upper_bound = guarded_price * (1 + range_percentage / 100)
@@ -120,7 +119,6 @@ if st.button("Predict Price"):
                     ax.scatter(mmv_subset['Age'], mmv_subset['Price_numeric'], color='blue', alpha=0.5, label='Dataset Cars (Same M-M-V)')
                     ax.scatter(age, guarded_price, color='purple', s=200, marker='*', label='Guarded Average Prediction')
                     ax.fill_between([age - 1, age + 1], lower_bound, upper_bound, color='lightgreen', alpha=0.2, label=f"±{range_percentage}% Range")
-=======
                     car_count = len(df[(df['Make'] == selected_make) & 
                                    (df['Model'] == selected_model) & 
                                    (df['Variant'] == selected_variant)])
@@ -159,19 +157,12 @@ if st.button("Predict Price"):
                     )
 
                     ax.set_xlim(0, plot_max_age)
->>>>>>> 7a9ddb136001b7fc66adfea54ff1b424eec04d92
                     ax.set_xlabel("Age (Years)")
                     ax.set_ylabel("Price (₹)")
                     ax.set_title(f"Age vs. Price for {selected_make} {selected_model} {selected_variant}")
                     ax.legend()
 
                     st.pyplot(fig)
-<<<<<<< HEAD
-=======
                 else:
                     st.write("No data to plot for this M-M-V subset.")
 
-
-
-
->>>>>>> 7a9ddb136001b7fc66adfea54ff1b424eec04d92
