@@ -1,10 +1,13 @@
 # config.py
 # Model and dataset paths
-MODEL_PATH_CAT = r'models\catboost_price_model.joblib'
-MODEL_PATH_CAT2 = r'models\catboost_model_of_5.joblib'
-MODEL_PATH_XGB = r'models\XGB_price_model.joblib'
-MODEL_PATH_DT = r'models\DT_price_model.joblib'
-DATASET_PATH = r'new_training_data.csv'
+MODEL_PATH_CAT = 'models/catboost_price_model.joblib'
+MODEL_PATH_CAT2 = 'models/catboost_model_of_5.joblib'
+MODEL_PATH_XGB = 'models/XGB_price_model.joblib'
+MODEL_PATH_DT = 'models/DT_price_model.joblib'
+DATASET_PATH = 'new_training_data.csv'
+
+
+
 CAR_DATA = {'Honda': {'Amaze': ['1.2 S i-VTEC[2013-2016]', 'VX CVT 1.2 Petrol [2021]'],
   'BR-V': ['V CVT Petrol'],
   'Brio': ['S MT', 'VX AT'],
