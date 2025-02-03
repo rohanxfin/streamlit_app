@@ -110,21 +110,19 @@ if st.button("Predict Price"):
                     if similar_cars.empty:
                         st.write("No similar cars found in the dataset for this M-M-V.")
                     else:
+
+                        # Optional Plot
+                        fig, ax = plt.subplots(figsize=(8, 6))
+                        mmv_subset = df[(df['Make'] == selected_make) & (df['Model'] == selected_model) & (df['Variant'] == selected_variant)]
+                        ax.scatter(mmv_subset['Age'], mmv_subset['Price_numeric'], color='blue', alpha=0.5, label='Dataset Cars (Same M-M-V)')
+                        ax.scatter(age, guarded_price, color='purple', s=200, marker='*', label='Guarded Average Prediction')
+                        ax.fill_between([age - 1, age + 1], lower_bound, upper_bound, color='lightgreen', alpha=0.2, label=f"±{range_percentage}% Range")
+                        car_count = len(df[(df['Make'] == selected_make) & 
+                                       (df['Model'] == selected_model) & 
+                                       (df['Variant'] == selected_variant)])
+                        st.write(f"Total data points for {selected_make} {selected_model} {selected_variant}: {car_count}")
                         st.write("Closest Cars (based on Age & Odometer):")
                         st.dataframe(similar_cars)
-
-                    # Optional Plot
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    mmv_subset = df[(df['Make'] == selected_make) & (df['Model'] == selected_model) & (df['Variant'] == selected_variant)]
-                    ax.scatter(mmv_subset['Age'], mmv_subset['Price_numeric'], color='blue', alpha=0.5, label='Dataset Cars (Same M-M-V)')
-                    ax.scatter(age, guarded_price, color='purple', s=200, marker='*', label='Guarded Average Prediction')
-                    ax.fill_between([age - 1, age + 1], lower_bound, upper_bound, color='lightgreen', alpha=0.2, label=f"±{range_percentage}% Range")
-                    car_count = len(df[(df['Make'] == selected_make) & 
-                                   (df['Model'] == selected_model) & 
-                                   (df['Variant'] == selected_variant)])
-                    st.write(f"Total data points for {selected_make} {selected_model} {selected_variant}: {car_count}")
-                    st.write("Closest Cars (based on Age & Odometer):")
-                    st.dataframe(similar_cars)
 
                 # Optional: Plot Age vs. Price for M-M-V subset
                 if not subset_mmv.empty:
